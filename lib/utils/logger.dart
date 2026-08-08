@@ -85,6 +85,11 @@ class AppLogger {
     }
   }
 
+  /// Log protocol-level events (sliding window, ACKs, retransmits)
+  static void protocol(String message) {
+    _logger.i('[🔧 Protocol] $message');
+  }
+
   /// Log file transfer events
   static void transfer(String message, {Object? data}) {
     _logger.i('[📁 Transfer] $message');

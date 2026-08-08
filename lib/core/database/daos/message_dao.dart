@@ -439,7 +439,7 @@ class MessageDao {
   }
 
   /// Get total size of attachments for a device
-  Future<long> getTotalAttachmentSize(String deviceId) async {
+  Future<int> getTotalAttachmentSize(String deviceId) async {
     final db = await _db;
     final result = await db.rawQuery('''
       SELECT COALESCE(SUM(file_size), 0) as total_size 

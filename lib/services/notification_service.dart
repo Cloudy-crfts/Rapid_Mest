@@ -45,7 +45,7 @@ class ForegroundService {
     try {
       AppLogger.info('Initializing Foreground Service', 'Foreground');
       
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings = AndroidInitializationSettings('ic_stat_notification');
       const initSettings = InitializationSettings(android: androidSettings);
       
       await _notifications.initialize(
@@ -90,13 +90,8 @@ class ForegroundService {
       importance: Importance.low, // Low importance = no sound
       priority: Priority.low,
       ongoing: true, // Persistent notification
-      showWhen: true,
-      icon: '@mipmap/ic_launcher',
-      
-      // Content
-      title: _buildTitle(),
-      contentText: _buildContent(),
-      subText: transferInfo != null ? 'Transferring...' : null,
+      showWhen: true,        icon: 'ic_stat_notification',
+        subText: transferInfo != null ? 'Transferring...' : null,
       
       // Style
       styleInformation: BigTextStyleInformation(_buildBigContent()),
@@ -156,11 +151,8 @@ class ForegroundService {
       importance: Importance.low,
       priority: Priority.low,
       ongoing: true,
-      showWhen: true,
-      icon: '@mipmap/ic_launcher',
-      title: _buildTitle(),
-      contentText: _buildContent(),
-      subText: _currentTransferInfo != null ? 'Transferring...' : null,
+      showWhen: true,        icon: 'ic_stat_notification',
+        subText: _currentTransferInfo != null ? 'Transferring...' : null,
       styleInformation: BigTextStyleInformation(_buildBigContent()),
       actions: [
         const AndroidNotificationAction('open_app', 'Open App'),
@@ -208,11 +200,8 @@ class ForegroundService {
       showWhen: true,
       showProgress: true,
       maxProgress: 100,
-      progress: progress.round(),
-      icon: '@mipmap/ic_launcher',
-      title: '$direction ${toDeviceName ?? "device"}',
-      contentText: '$fileName • ${progress.toStringAsFixed(1)}% • $speed',
-      styleInformation: BigTextStyleInformation(
+      progress: progress.round(),        icon: 'ic_stat_notification',
+        styleInformation: BigTextStyleInformation(
         '''$fileName
 
 Progress: ${progress.toStringAsFixed(1)}%
@@ -251,7 +240,7 @@ $direction: ${toDeviceName ?? "device"}''',
         channelDescription: 'Shows file transfer progress',
         importance: Importance.low,
         priority: Priority.low,
-        icon: '@mipmap/ic_launcher',
+        icon: 'ic_stat_notification',
       );
       
       const platformDetails = NotificationDetails(android: androidDetails);
@@ -272,7 +261,7 @@ $direction: ${toDeviceName ?? "device"}''',
       channelDescription: 'Incoming connection requests from other devices',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'ic_stat_notification',
       title: 'Connection Request',
       contentText: '$fromDeviceName wants to connect',
       actions: [
@@ -286,7 +275,7 @@ $direction: ${toDeviceName ?? "device"}''',
   }
 
   /// Show error/warning notification
-  Future<void showError({
+  Future<void> showError({
     required String title,
     required String message,
   }) async {
@@ -296,7 +285,7 @@ $direction: ${toDeviceName ?? "device"}''',
       channelDescription: 'Error and warning notifications',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'ic_stat_notification',
     );
     
     const platformDetails = NotificationDetails(android: androidDetails);

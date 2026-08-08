@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:math';
+import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import 'package:pointycastle/pointycastle.dart' as pc;
 import '../utils/constants.dart';
@@ -35,7 +36,7 @@ class EncryptionService {
   SimplePublicKey? get publicKey => _keyPair?.publicKey;
   
   // Derived shared secrets per device (address -> encryption key)
-  final Map<String, SecretBox> _deviceKeys = {};
+  final Map<String, SecretKey> _deviceKeys = {};
   
   // Algorithm instances
   final AesGcm _aes = AesGcm.with256bits();
@@ -132,7 +133,7 @@ class EncryptionService {
   }
 
   /// Derive AES-256 key from shared secret using HKDF
-  Future<SecretBox> _deriveEncryptionKey(SecretKey sharedSecret, String context) async {
+  Future<SecretKey> _deriveEncryptionKey(SecretKey sharedSecret, String context) async {
     // Use HKDF to derive a proper encryption key
     final hkdf = Hkdf(
       hmac: Sha256(),
@@ -169,7 +170,7 @@ class EncryptionService {
       final iv = _generateSecureRandom(12);
       
       // Get encryption key for this device
-      final secretKey = _deviceKeys[deviceAddress];
+      final secretKey = _deviceKeys[deviceAddress]!;
       
       // Encrypt with AES-256-GCM
       final encrypted = await _aes.encrypt(
@@ -214,7 +215,7 @@ class EncryptionService {
       final macBytes = ciphertext.sublist(ciphertext.length - 16);
       
       // Get encryption key
-      final secretKey = _deviceKeys[deviceAddress];
+      final secretKey = _deviceKeys[deviceAddress]!;
       
       // Create SecretBox for decryption
       final secretBox = SecretBox(
@@ -388,7 +389,7 @@ class EncryptionService {
   // Encoding helpers
   String _bytesToHex(Uint8List bytes) => bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   Uint8List _hexToBytes(String hex) => Uint8List.fromList(
-    List.generate(hex.length ~/ 2, (i) => int.parse(hex.substring(i * 2, i * 2 + 16), radix: 16))
+    List.generate(hex.length ~/ 2, (i) =>    int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16))
   );
   String _bytesToBase64(Uint8List bytes) => base64Url.encode(bytes);
   Uint8List? _base64ToBytes(String encoded) => base64Url.tryDecode(encoded);

@@ -10,7 +10,7 @@ class Message {
   final String? content;           // Text content or file metadata JSON
   final String? filePath;          // Local path to attached file
   final String? fileName;          // Original filename
-  final long? fileSize;            // File size in bytes
+  final int? fileSize;            // File size in bytes
   final String? mimeType;          // MIME type of attachment
   final String? thumbnailPath;     // Path to generated thumbnail
   final String? checksum;          // SHA-256 for integrity verification
@@ -160,7 +160,7 @@ class Message {
     String? content,
     String? filePath,
     String? fileName,
-    long? fileSize,
+    int? fileSize,
     String? mimeType,
     String? thumbnailPath,
     String? checksum,

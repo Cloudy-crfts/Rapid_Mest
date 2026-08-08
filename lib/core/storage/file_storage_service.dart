@@ -432,12 +432,12 @@ class FileStorageService {
   }
 
   /// Calculate total size of a directory
-  Future<long> getDirectorySize(String dirPath) async {
+  Future<int> getDirectorySize(String dirPath) async {
     try {
       final dir = Directory(dirPath);
       if (!await dir.exists()) return 0;
       
-      long totalSize = 0;
+      int totalSize = 0;
       await for (final entity in dir.list(recursive: true)) {
         if (entity is File) {
           final stat = await entity.stat();
@@ -454,11 +454,11 @@ class FileStorageService {
 
   /// Get total app storage usage
   Future<StorageUsage> getTotalAppUsage() async {
-    long receivedSize = await getDirectorySize(_receivedFilesDir);
-    long sentSize = await getDirectorySize(_sentFilesDir);
-    long voiceSize = await getDirectorySize(_voiceMessagesDir);
-    long imageSize = await getDirectorySize(_imagesDir);
-    long tempSize = await getDirectorySize(_tempTransfersDir);
+    final int receivedSize = await getDirectorySize(_receivedFilesDir);
+    final int sentSize = await getDirectorySize(_sentFilesDir);
+    final int voiceSize = await getDirectorySize(_voiceMessagesDir);
+    final int imageSize = await getDirectorySize(_imagesDir);
+    final int tempSize = await getDirectorySize(_tempTransfersDir);
     
     return StorageUsage(
       receivedFiles: receivedSize,
@@ -499,7 +499,7 @@ enum StorageType {
 class FileInfo {
   final String path;
   final String name;
-  final long size;
+  final int size;
   final DateTime modifiedAt;
   final bool isFile;
 
@@ -532,12 +532,12 @@ class FileInfo {
 
 /// Storage usage statistics
 class StorageUsage {
-  final long receivedFiles;
-  final long sentFiles;
-  final long voiceMessages;
-  final long images;
-  final long tempTransfers;
-  final long total;
+  final int receivedFiles;
+  final int sentFiles;
+  final int voiceMessages;
+  final int images;
+  final int tempTransfers;
+  final int total;
 
   StorageUsage({
     required this.receivedFiles,

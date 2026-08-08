@@ -59,10 +59,10 @@ android {
             // Signing with debug keys for now, so `flutter run --release` works
             signingConfig signingConfigs.debug
             
-            // Code compression and optimization
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Minification disabled for reliable plugin compatibility
+            // (R8 can strip reflection-based plugin code and break the build)
+            minifyEnabled false
+            shrinkResources false
         }
         
         debug {

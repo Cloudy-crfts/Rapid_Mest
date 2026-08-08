@@ -49,9 +49,8 @@ class BluetoothDeviceInfo {
 
   /// Check if this is a Rapid Mesh device by service UUID
   static bool checkIsRapidMesh(ScanResult result) {
-    return result.serviceUuids.contains(AppConstants.bleServiceUuid) ||
-           result.device.localName?.startsWith(AppConstants.deviceNamePrefix) == true ||
-           result.advertisementServiceUuids.contains(AppConstants.bleServiceUuid);
+    return result.advertisementData.serviceUuids.contains(Guid(AppConstants.bleServiceUuid)) ||
+           result.device.localName?.startsWith(AppConstants.deviceNamePrefix) == true;
   }
 }
 
@@ -92,10 +91,6 @@ class BleService {
   BleServiceState _state = BleServiceState.initializing;
   BleServiceState get state => _state;
   
-  // Flutter Blue Plus instance
-  FlutterBluePlus? _flutterBlue;
-  FlutterBluePlus? get flutterBlue => _flutterBlue;
-  
   // Discovered devices map (address -> info)
   final Map<String, BluetoothDeviceInfo> _discoveredDevices = {};
   Map<String, BluetoothDeviceInfo> get discoveredDevices => Map.unmodifiable(_discoveredDevices);
@@ -135,23 +130,17 @@ class BleService {
       
       _setState(BleServiceState.initializing);
       
-      // Initialize Flutter Blue Plus
-      _flutterBlue = FlutterBluePlus.instance;
-      
       // Check adapter state
-      final adapterState = await _flutterBlue!.state.first;
+      final adapterState = await FlutterBluePlus.adapterState.first;
       if (adapterState != BluetoothAdapterState.on) {
         AppLogger.warn('Bluetooth adapter not on: $adapterState', 'BLE');
-        // Try to turn on
-        if (await _flutterBlue!.turnOn()) {
-          AppLogger.info('Bluetooth turned on successfully', 'BLE');
-        } else {
-          throw Exception('Bluetooth is off and cannot be turned on automatically');
-        }
+        // Request the adapter to turn on
+        await FlutterBluePlus.turnOn();
+        AppLogger.info('Bluetooth turn-on request sent', 'BLE');
       }
       
       // Listen to adapter state changes
-      _adapterStateSubscription = _flutterBlue!.state.listen(_onAdapterStateChanged);
+      _adapterStateSubscription = FlutterBluePlus.adapterState.listen(_onAdapterStateChanged);
       
       _setState(BleServiceState.ready);
       AppLogger.info('BLE service initialized successfully', 'BLE');
@@ -189,7 +178,7 @@ class BleService {
       AppLogger.info('Starting BLE scan for ${scanDuration.inSeconds}s', 'BLE');
       
       // Start scanning with Rapid Mesh service UUID
-      await _flutterBlue!.startScan(
+      await FlutterBluePlus.startScan(
         timeout: scanDuration,
         androidUsesFineLocation: false,
         allowDuplicates: allowDuplicates,
@@ -199,7 +188,7 @@ class BleService {
       );
       
       // Listen to scan results
-      _scanSubscription = _flutterBlue!.scanResults.listen(_onScanResult);
+      _scanSubscription = FlutterBluePlus.scanResults.listen(_onScanResult);
       
       // Auto-stop after duration
       _scanTimer = Timer(scanDuration, () {
@@ -223,7 +212,7 @@ class BleService {
       _scanTimer?.cancel();
       _scanTimer = null;
       
-      await _flutterBlue?.stopScan();
+      await FlutterBluePlus.stopScan();
       await _scanSubscription?.cancel();
       
       _setState(BleServiceState.ready);
@@ -270,7 +259,7 @@ class BleService {
       _activeConnections[address] = device;
       
       // Listen to connection state changes
-      _connectionStateSubscription = device.state.listen((state) {
+      _connectionStateSubscription = device.connectionState.listen((state) {
         _onDeviceConnectionStateChanged(address, state);
       });
       
@@ -401,7 +390,7 @@ class BleService {
       await characteristic.setNotifyValue(true);
       
       characteristic.lastValueStream.listen((data) {
-        onDataReceived?.call(address, data);
+        onDataReceived?.call(address, Uint8List.fromList(data));
       });
       
       AppLogger.debug('Notifications enabled for: ${characteristic.uuid}', 'BLE');
@@ -457,7 +446,7 @@ class BleService {
         throw Exception('Characteristic does not support reading');
       }
       
-      return await characteristic.read();
+      return Uint8List.fromList(await characteristic.read());
     } catch (e) {
       AppLogger.error('Failed to read data', 'BLE', e);
       return null;
@@ -575,9 +564,11 @@ class BleService {
         type: device.type,
         rssi: result.rssi,
         isConnectable: result.advertisementData.connectable,
-        isRapidMesh: BluetoothDeviceInfo.checkIsRapidMesh(result),
+        isRapidMeshDevice: BluetoothDeviceInfo.checkIsRapidMesh(result),
         serviceData: result.advertisementData.serviceData,
-        serviceUuids: result.serviceUuids,
+        serviceUuids: result.advertisementData.serviceUuids
+            .map((g) => g.toString())
+            .toList(),
         txPowerLevel: result.advertisementData.txPowerLevel,
       );
       

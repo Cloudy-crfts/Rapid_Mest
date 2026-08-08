@@ -9,57 +9,38 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   # State Management
   provider: ^6.1.1
-  
+
   # Database (SQLite)
   sqflite: ^2.3.0
   path: ^1.8.3
   path_provider: ^2.1.1
-  
+
   # Bluetooth - BLE
   flutter_blue_plus: ^1.31.15
-  
+
   # Bluetooth - Classic (maintained fork of flutter_bluetooth_serial;
   # the original package 0.4.x is incompatible with Dart 3 / modern AGP)
   flutter_bluetooth_serial_plus: ^0.5.6
-  
+
   # Encryption & Security
   cryptography: ^2.7.1
   pointycastle: ^3.7.3
-  
-  # File Handling
-  file_picker: ^6.1.1
+
+  # Permissions
   permission_handler: ^11.1.0
-  
-  # Media & Voice Recording
-  record: ^5.1.0
-  audioplayers: ^5.2.1
-  image_picker: ^1.0.5
-  geolocator: ^10.1.0
-  
-  # UI Components
-  cached_network_image: ^3.3.1
-  intl: ^0.18.1
-  url_launcher: ^6.2.1
-  
-  # Icons
-  cupertino_icons: ^1.0.6
-  font_awesome_flutter: ^10.6.0
-  
-  # Utilities
-  uuid: ^4.2.1
-  logger: ^2.0.2+1
-  shared_preferences: ^2.2.2
-  
-  # Notifications
+
+  # Notifications (foreground connection status)
   flutter_local_notifications: ^16.2.0
-  
-  # Device Info & Battery
-  device_info_plus: ^9.1.0
-  # v6+ required: v5 uses legacy Gradle APIs removed in recent Flutter versions
+
+  # Battery / thermal monitoring
   battery_plus: ^6.0.0
+
+  # Utilities
+  intl: ^0.18.1
+  logger: ^2.0.2+1
 
 dev_dependencies:
   flutter_test:

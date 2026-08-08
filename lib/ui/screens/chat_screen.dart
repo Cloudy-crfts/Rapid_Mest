@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/dark_theme.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/file_progress_widget.dart';
+import '../../core/bluetooth/bluetooth_service.dart';
+import '../../core/database/models/file_transfer.dart';
+import '../../core/database/models/message.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
 
@@ -36,7 +40,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   
   bool _isTyping = false;
-  bool _isConnected = true; // Would come from BluetoothService
+  bool _isConnected = true;
+  StreamSubscription<ConnectionEvent>? _eventSub;
   
   // Sample messages for demo
   late List<_SampleMessage> _messages;
@@ -45,8 +50,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     
-    // Initialize with sample data
-    _messages = [
+    // Subscribe to real Bluetooth connection events
+    _eventSub = BluetoothService.instance.events.listen(_handleConnectionEvent);
+
+    // Real connection mode: start with a greeting. Demo mode: sample data.
+    if (widget.deviceAddress != null && widget.deviceAddress!.isNotEmpty) {
+      _messages = [
+        _SampleMessage(
+          id: 'welcome',
+          content: '🔗 Connected to ${widget.deviceName}. Say hello!',
+          isSent: false,
+          time: DateTime.now(),
+          status: MessageStatus.read,
+        ),
+      ];
+    } else {
+      _messages = [
       _SampleMessage(
         id: '1',
         content: 'Hey! How are you?',
@@ -129,14 +148,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         transferProgress: 67.5,
         transferSpeed: 125000, // ~125 KB/s
       ),
-    ];
-    
+      ];
+    }
+
     // Scroll to bottom after build
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   @override
   void dispose() {
+    _eventSub?.cancel();
     _messageController.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -339,7 +360,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           fileSize: activeTransfer.fileSize ?? 0,
           mimeType: '*/*',
           direction: activeTransfer.isSent ? 0 : 1,
-          status: TransferStatus.transferring,
+          status: AppConstants.TransferStatus.transferring,
           bytesTransferred: ((activeTransfer.transferProgress ?? 0) / 100 * (activeTransfer.fileSize ?? 0)).toInt(),
           currentSpeed: activeTransfer.transferSpeed?.toInt() ?? 0,
         ),
@@ -449,9 +470,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
 
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final text = _messageController.text.trim();
+
     final newMessage = _SampleMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: _messageController.text.trim(),
+      id: messageId,
+      content: text,
       isSent: true,
       time: DateTime.now(),
       status: MessageStatus.sending,
@@ -465,19 +489,63 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     _scrollToBottom();
 
-    // Simulate sending (would use BluetoothService in real app)
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        newMessage.status = MessageStatus.sent;
-      });
-      
-      // Simulate delivery after another delay
-      Future.delayed(const Duration(seconds: 1), () {
-        setState(() {
-          newMessage.status = MessageStatus.delivered;
+    final address = widget.deviceAddress;
+    if (address == null || address.isEmpty) {
+      // Demo mode: simulate delivery
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        setState(() => newMessage.status = MessageStatus.sent);
+        Future.delayed(const Duration(seconds: 1), () {
+          if (!mounted) return;
+          setState(() => newMessage.status = MessageStatus.delivered);
         });
       });
+      return;
+    }
+
+    // Real mode: transmit over the Bluetooth connection
+    BluetoothService.instance
+        .sendTextMessage(address: address, messageId: messageId, text: text)
+        .then((ok) {
+      if (!mounted) return;
+      setState(() {
+        newMessage.status = ok ? MessageStatus.sent : MessageStatus.failed;
+      });
     });
+  }
+
+  /// Handle real Bluetooth connection events for this device's chat.
+  void _handleConnectionEvent(ConnectionEvent event) {
+    if (widget.deviceAddress == null || event.address != widget.deviceAddress) {
+      return;
+    }
+    if (!mounted) return;
+
+    if (event is TextMessageReceivedEvent) {
+      setState(() {
+        _isConnected = true;
+        _messages.add(_SampleMessage(
+          id: event.messageId,
+          content: event.text,
+          isSent: false,
+          time: event.sentAt,
+          status: MessageStatus.read,
+        ));
+      });
+      _scrollToBottom();
+    } else if (event is TextMessageAckEvent) {
+      setState(() {
+        for (final m in _messages) {
+          if (m.id == event.messageId && m.status == MessageStatus.sent) {
+            m.status = MessageStatus.delivered;
+          }
+        }
+      });
+    } else if (event is ConnectionLostEvent) {
+      setState(() {
+        _isConnected = false;
+      });
+    }
   }
 
   void _startVoiceRecording() {
@@ -762,7 +830,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              Icon(Icons.block, color: AppTheme.error),
+              leading: Icon(Icons.block, color: AppTheme.error),
               title: Text('Block Device', style: TextStyle(color: AppTheme.error)),
               onTap: () => Navigator.pop(context),
             ),
@@ -783,11 +851,11 @@ class _SampleMessage {
   final String id;
   final String? content;
   final String? fileName;
-  final long? fileSize;
+  final int? fileSize;
   final int? duration; // For voice messages in seconds
   final bool isSent;
   final DateTime time;
-  final MessageStatus status;
+  MessageStatus status;
   final MessageType type;
   final String? replyToId;
   final double? transferProgress;

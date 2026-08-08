@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import '../utils/constants.dart';
+import '../../utils/helpers.dart';
 import '../../utils/logger.dart';
 
 /// Bandwidth Allocation Strategy
@@ -16,7 +17,7 @@ class ConnectionBandwidth {
   final String deviceId;
   int allocatedBps;        // Currently allocated bandwidth
   int usedBps;             // Actually used bandwidth
-  long totalBytesTransferred;
+  int totalBytesTransferred;
   int activeTransfers;     // Number of active transfers
   double priority;         // Priority weight (0.0 - 1.0)
   DateTime? lastActivity;

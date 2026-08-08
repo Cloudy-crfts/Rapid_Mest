@@ -257,7 +257,7 @@ class Helpers {
   /// Sanitize input string
   static String sanitizeInput(String input) {
     // Remove control characters but keep newlines and tabs
-    return input.replaceAll(RegExp(r[\x00-\x08\x0B\x0C\x0E-\x1F]), '');
+    return input.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]'), '');
   }
 
   /// Truncate text with ellipsis

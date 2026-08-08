@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:pointycastle/pointycastle.dart' as pc;
 import '../utils/constants.dart';
 import '../../utils/helpers.dart';
 
@@ -100,7 +101,7 @@ class ChunkManager {
   /// Initialize receiver for incoming file transfer
   FileReceiver createReceiver({
     required String fileName,
-    required long fileSize,
+    required int fileSize,
     required int totalChunks,
     required String expectedChecksum,
     String? destinationDir,
@@ -153,7 +154,7 @@ class FileChunk {
 class ChunkedFile {
   final String fileName;
   final String filePath;
-  final long fileSize;
+  final int fileSize;
   final int totalChunks;
   final List<FileChunk> chunks;
   final String checksum;       // SHA-256 of complete file
@@ -188,7 +189,7 @@ class ChunkedFile {
 /// Handles receiving and reassembling file chunks
 class FileReceiver {
   final String fileName;
-  final long fileSize;
+  final int fileSize;
   final int totalChunks;
   final String expectedChecksum;
   final String? destinationDir;
@@ -205,7 +206,7 @@ class FileReceiver {
   String? actualChecksum;
   
   // Callbacks
-  typedef OnProgressCallback = void Function(int receivedCount, int totalChunks, long bytesReceived);
+  typedef OnProgressCallback = void Function(int receivedCount, int totalChunks, int bytesReceived);
   OnProgressCallback? onProgress;
   
   typedef OnCompleteCallback = void Function(String filePath);
@@ -320,7 +321,7 @@ class FileReceiver {
       
       // Move to final location
       finalFilePath = path.join(dir, fileName);
-      final finalFile = File(finalFilePath);
+      var finalFile = File(finalFilePath);
       
       // Handle filename conflicts
       if (await finalFile.exists()) {
@@ -348,8 +349,8 @@ class FileReceiver {
   }
 
   /// Get total bytes received so far
-  long getReceivedBytes() {
-    long total = 0;
+  int getReceivedBytes() {
+    int total = 0;
     for (final chunk in _receivedChunks.values) {
       total += chunk.length;
     }

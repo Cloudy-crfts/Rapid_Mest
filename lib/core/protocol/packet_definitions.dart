@@ -18,7 +18,7 @@ class PacketHeader {
   
   final int version;        // Protocol version (currently 1)
   final int packetType;     // See AppConstants.PacketType
-  final int flags;          // Bit field for various flags
+  int flags;                // Bit field for various flags
   final int payloadLength;  // Length of payload following header
   final int sequenceNumber; // For ordering and ACK tracking
 
@@ -78,7 +78,7 @@ class PacketHeader {
 
   @override
   String toString() =>
-      'PacketHeader(v$version, type=0x${packetType.toRadixString(16)}, seq=$seq, len=$payloadLength)';
+      'PacketHeader(v$version, type=0x${packetType.toRadixString(16)}, seq=$sequenceNumber, len=$payloadLength)';
 }
 
 /// Complete Packet with optional payload and checksum
@@ -302,7 +302,7 @@ class Packets {
   static Packet createFileRequest({
     required String transferId,
     required String fileName,
-    required long fileSize,
+    required int fileSize,
     required String mimeType,
     required String checksum,
   }) {

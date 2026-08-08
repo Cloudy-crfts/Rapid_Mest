@@ -8,19 +8,19 @@ class FileTransfer {
   final String transferId;         // Unique UUID for this transfer session
   final String deviceId;           // Foreign key to Device
   final String fileName;           // Original filename
-  final long fileSize;             // Total file size in bytes
+  final int fileSize;             // Total file size in bytes
   final String? filePath;          // Local path (source for send, destination for receive)
   final String mimeType;
   final int direction;             // 0 = outgoing (sending), 1 = incoming (receiving)
   final int status;                // See AppConstants.TransferStatus
-  final long bytesTransferred;     // Bytes completed so far
-  final long lastChunkIndex;       // Last successfully transferred chunk index
+  final int bytesTransferred;     // Bytes completed so far
+  final int lastChunkIndex;       // Last successfully transferred chunk index
   final int totalChunks;           // Total number of chunks
   final Set<int> receivedChunks;   // Set of chunk indices that have been received
   final String? checksum;          // Expected SHA-256 checksum
   final String? actualChecksum;    // Calculated checksum after completion
   final int currentSpeed;          // Current transfer speed in bytes/sec
-  final long averageSpeed;         // Average speed in bytes/sec
+  final int averageSpeed;         // Average speed in bytes/sec
   final DateTime? startedAt;       // When transfer started
   final DateTime? pausedAt;        // When transfer was paused
   final DateTime? resumedAt;       // When transfer was resumed
@@ -149,7 +149,7 @@ class FileTransfer {
   }
 
   /// Get remaining bytes
-  long get remainingBytes => max(0, fileSize - bytesTransferred);
+  int get remainingBytes => max(0, fileSize - bytesTransferred);
 
   /// Check if transfer is active (in progress or paused)
   bool get isActive =>
@@ -204,19 +204,19 @@ class FileTransfer {
     String? transferId,
     String? deviceId,
     String? fileName,
-    long? fileSize,
+    int? fileSize,
     String? filePath,
     String? mimeType,
     int? direction,
     int? status,
-    long? bytesTransferred,
-    long? lastChunkIndex,
+    int? bytesTransferred,
+    int? lastChunkIndex,
     int? totalChunks,
     Set<int>? receivedChunks,
     String? checksum,
     String? actualChecksum,
     int? currentSpeed,
-    long? averageSpeed,
+    int? averageSpeed,
     DateTime? startedAt,
     DateTime? pausedAt,
     DateTime? resumedAt,

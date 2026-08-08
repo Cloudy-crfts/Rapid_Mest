@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'ble_service.dart';
 import 'classic_bluetooth_service.dart';
+import 'native_connection_service.dart';
 import '../utils/constants.dart';
 import '../utils/logger.dart';
 
@@ -23,6 +25,8 @@ class ConnectionInfo {
   DateTime? lastActivityAt;
   int pendingMessages;
   bool hasActiveTransfer;
+  int? nativeConnectionId;
+  String? remoteName;
 
   ConnectionInfo({
     required this.address,
@@ -45,6 +49,63 @@ class ConnectionInfo {
     if (isClassicConnected) return 'classic';
     return 'none';
   }
+}
+
+// ==================== CONNECTION EVENTS ====================
+//
+// These are pushed onto [BluetoothService.events] so UI screens can react
+// to real connection state changes (incoming requests, accepted/rejected
+// requests, connection loss, incoming messages and delivery acks).
+
+sealed class ConnectionEvent {
+  const ConnectionEvent();
+}
+
+/// Another phone is asking to connect to us.
+class IncomingRequestEvent extends ConnectionEvent {
+  final String address;
+  final String name;
+  const IncomingRequestEvent({required this.address, required this.name});
+}
+
+/// A connection (either direction) is fully established and ready for chat.
+class ConnectionEstablishedEvent extends ConnectionEvent {
+  final String address;
+  final String name;
+  const ConnectionEstablishedEvent({required this.address, required this.name});
+}
+
+/// Our outgoing connection request was declined (or could not reach the device).
+class ConnectionRequestRejectedEvent extends ConnectionEvent {
+  final String address;
+  const ConnectionRequestRejectedEvent({required this.address});
+}
+
+/// An established connection was lost.
+class ConnectionLostEvent extends ConnectionEvent {
+  final String address;
+  const ConnectionLostEvent({required this.address});
+}
+
+/// A text message arrived from a connected device.
+class TextMessageReceivedEvent extends ConnectionEvent {
+  final String address;
+  final String messageId;
+  final String text;
+  final DateTime sentAt;
+  const TextMessageReceivedEvent({
+    required this.address,
+    required this.messageId,
+    required this.text,
+    required this.sentAt,
+  });
+}
+
+/// The remote device confirmed receipt of one of our messages.
+class TextMessageAckEvent extends ConnectionEvent {
+  final String address;
+  final String messageId;
+  const TextMessageAckEvent({required this.address, required this.messageId});
 }
 
 /// Main Bluetooth Service
@@ -80,6 +141,14 @@ class BluetoothService {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  // Connections that completed the app-level handshake
+  final Set<String> _establishedConnections = {};
+
+  // Broadcast stream of real connection events for the UI
+  final StreamController<ConnectionEvent> _eventController =
+      StreamController<ConnectionEvent>.broadcast();
+  Stream<ConnectionEvent> get events => _eventController.stream;
+
   // Callbacks
   typedef OnDeviceDiscoveredCallback = void Function(dynamic device);
   typedef OnConnectionChangedCallback = void Function(String address, bool connected);
@@ -96,6 +165,7 @@ class BluetoothService {
   // Private constructor
   BluetoothService._internal() {
     _setupSubServiceCallbacks();
+    _setupNativeCallbacks();
   }
 
   /// Setup callbacks from sub-services
@@ -115,7 +185,7 @@ class BluetoothService {
     };
 
     _bleService.onError = (error, {stackTrace}) {
-      AppLogger.error('BLE error: $error', 'BT', error as Exception?, stackTrace);
+      AppLogger.error('BLE error: $error', 'BT', error, stackTrace);
       onError?.call('BLE Error: $error');
     };
 
@@ -130,7 +200,7 @@ class BluetoothService {
     };
 
     _classicService.onError = (error) {
-      AppLogger.error('Classic BT error: $error', 'BT', error as Exception?);
+      AppLogger.error('Classic BT error: $error', 'BT', error);
       onError?.call('Classic BT Error: $error');
     };
   }
@@ -152,7 +222,18 @@ class BluetoothService {
         AppLogger.warn('Classic Bluetooth not available, will use BLE only', 'BT');
         // Not fatal - we can work with just BLE
       }
-      
+
+      // Start the native layer: RFCOMM server + BLE advertising.
+      // Retry briefly in case the adapter is still turning on.
+      var nativeStarted = await NativeConnectionService.instance.start();
+      for (var attempt = 0; !nativeStarted && attempt < 3; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        nativeStarted = await NativeConnectionService.instance.start();
+      }
+      if (!nativeStarted) {
+        AppLogger.warn('Native Bluetooth layer not running (is Bluetooth on?)', 'BT');
+      }
+
       _isInitialized = true;
       AppLogger.info('Bluetooth Service initialized successfully', 'BT');
       
@@ -180,95 +261,77 @@ class BluetoothService {
 
   // ==================== CONNECTION MANAGEMENT ====================
 
-  /// Initiate connection to a device
-  /// 
-  /// Connects via BLE first for discovery/messaging,
-  /// then optionally establishes Classic BT for file transfers.
-  Future<bool> connectToDevice(String address) async {
-    try {
-      // Check rejection cooldown
-      if (_isInCooldown(address)) {
-        final remaining = _getCooldownRemaining(address);
-        throw Exception(
-          'Device is in cooldown period. Try again in ${remaining.inMinutes}m ${remaining.inSeconds % 60}s'
-        );
-      }
-      
-      AppLogger.info('Initiating connection to: $address', 'BT');
-      
-      // Step 1: Connect via BLE
-      final bleConnected = await _bleService.connectToDevice(address: address);
-      
-      if (!bleConnected) {
-        throw Exception('BLE connection failed');
-      }
-      
-      // Create or update connection info
-      _connections[address] ??= ConnectionInfo(address: address);
-      _connections[address]!.isBleConnected = true;
-      _connections[address]!.role = ConnectionRole.initiator;
-      _connections[address]!.connectedAt ??= DateTime.now();
-      _connections[address]!.lastActivityAt = DateTime.now();
-      
-      // Step 2: Optionally connect via Classic BT for better file transfer speeds
-      // We do this in background to not block the initial connection
-      _establishClassicConnectionInBackground(address);
-      
-      AppLogger.info('Connected to device: $address', 'BT');
-      return true;
-      
-    } catch (e) {
-      AppLogger.error('Failed to connect to: $address', 'BT', e);
-      rethrow;
-    }
-  }
-
-  /// Accept incoming connection request
-  Future<bool> acceptConnection(String address) async {
-    try {
-      AppLogger.info('Accepting connection from: $address', 'BT');
-      
-      // Clear any existing cooldown
-      _rejectionCooldowns.remove(address);
-      
-      // Create connection info
-      _connections[address] = ConnectionInfo(
-        address: address,
-        role: ConnectionRole.acceptor,
-        connectedAt: DateTime.now(),
-        lastActivityAt: DateTime.now(),
-      );
-      
-      // Accept BLE connection (the remote device initiated)
-      // In practice, this means we're ready to accept their connection
-      
-      // Also prepare Classic BT
-      await _classicService.connectToDevice(address: address);
-      _connections[address]!.isClassicConnected = true;
-      
-      onConnectionChanged?.call(address, true);
-      AppLogger.info('Accepted connection from: $address', 'BT');
-      
-      return true;
-    } catch (e) {
-      AppLogger.error('Failed to accept connection from: $address', 'BT', e);
+  /// Send a connection request to a discovered Rapid Mesh device.
+  ///
+  /// Dials the device over RFCOMM using the Rapid Mesh service UUID.
+  /// If the dial succeeds a handshake is sent; the connection only counts
+  /// as established once the other side accepts.
+  Future<bool> sendConnectionRequest(String address) async {
+    if (_isInCooldown(address)) {
+      AppLogger.warn('Connection request to $address is in cooldown', 'BT');
       return false;
     }
+
+    AppLogger.info('Sending connection request to: $address', 'BT');
+
+    final ok = await NativeConnectionService.instance.connect(address);
+    if (ok) {
+      final info = _connections[address] ??=
+          ConnectionInfo(address: address, role: ConnectionRole.initiator);
+      info.role = ConnectionRole.initiator;
+    }
+    return ok;
   }
 
-  /// Reject incoming connection request
-  /// 
-  /// Sets a cooldown period during which this device cannot retry
-  Future<void> rejectConnection(String address) async {
+  /// Accept an incoming connection request (receiver side).
+  ///
+  /// Sends a handshake response back to the initiator and marks the
+  /// connection as established on this side.
+  Future<void> acceptIncomingConnection(String address) async {
+    AppLogger.info('Accepting connection from: $address', 'BT');
+
+    _rejectionCooldowns.remove(address);
+
+    final info = _connections[address] ??=
+        ConnectionInfo(address: address, role: ConnectionRole.acceptor);
+    info.role = ConnectionRole.acceptor;
+    info.connectedAt ??= DateTime.now();
+    info.isClassicConnected = true;
+
+    _establishedConnections.add(address);
+
+    final id = NativeConnectionService.instance.connectionIdForAddress(address);
+    if (id != null) {
+      final nameBytes = utf8.encode(AppConstants.deviceDisplayName);
+      final packet = Uint8List.fromList(
+          [AppConstants.PacketType.handshakeResponse, ...nameBytes]);
+      await NativeConnectionService.instance.send(id, packet);
+    }
+
+    _eventController.add(ConnectionEstablishedEvent(
+      address: address,
+      name: info.remoteName ?? 'Device',
+    ));
+  }
+
+  /// Reject an incoming connection request (receiver side).
+  ///
+  /// Sends a rejection packet and closes the socket. The initiator goes
+  /// into a cooldown period so they cannot retry immediately.
+  Future<void> rejectIncomingConnection(String address) async {
     AppLogger.info('Rejecting connection from: $address (cooldown: ${AppConstants.rejectionCooldownMinutes}min)', 'BT');
-    
-    // Set cooldown
+
     _rejectionCooldowns[address] = DateTime.now().add(
-      Duration(minutes: AppConstants.rejectionCooldownMinutes)
+      Duration(minutes: AppConstants.rejectionCooldownMinutes),
     );
-    
-    // Notify callback
-    onConnectionChanged?.call(address, false);
+
+    final id = NativeConnectionService.instance.connectionIdForAddress(address);
+    if (id != null) {
+      final packet = Uint8List.fromList([AppConstants.PacketType.connectionRejected]);
+      await NativeConnectionService.instance.send(id, packet);
+      await NativeConnectionService.instance.reject(id);
+    }
+    _connections.remove(address);
   }
 
   /// Disconnect from a specific device
@@ -299,6 +362,14 @@ class BluetoothService {
     required Uint8List data,
   }) async {
     try {
+      // Prefer the native RFCOMM socket (the real P2P connection)
+      final nativeId = NativeConnectionService.instance.connectionIdForAddress(address);
+      if (nativeId != null) {
+        final ok = await NativeConnectionService.instance.send(nativeId, data);
+        if (ok) _connections[address]?.lastActivityAt = DateTime.now();
+        return ok;
+      }
+
       final connInfo = _connections[address];
       if (connInfo == null || !connInfo.isConnected) {
         throw Exception('Not connected to device: $address');
@@ -330,6 +401,14 @@ class BluetoothService {
     required int chunkIndex,
   }) async {
     try {
+      // Prefer the native RFCOMM socket for real transfers
+      final nativeId = NativeConnectionService.instance.connectionIdForAddress(address);
+      if (nativeId != null) {
+        final ok = await NativeConnectionService.instance.send(nativeId, chunk);
+        if (ok) _connections[address]?.lastActivityAt = DateTime.now();
+        return ok;
+      }
+
       final connInfo = _connections[address];
       if (connInfo == null || !connInfo.isConnected) {
         throw Exception('Not connected to device: $address');
@@ -374,6 +453,190 @@ class BluetoothService {
       data: data,
       withoutResponse: false, // Control signals need confirmation
     );
+  }
+
+  // ==================== NATIVE P2P CONNECTION (REAL RFCOMM) ====================
+
+  /// Wire up callbacks from the native RFCOMM layer.
+  void _setupNativeCallbacks() {
+    final native = NativeConnectionService.instance;
+
+    native.onIncomingRequest = (id, name, address) {
+      _connections[address] ??= ConnectionInfo(
+        address: address,
+        role: ConnectionRole.acceptor,
+        nativeConnectionId: id,
+        remoteName: name,
+      );
+      _eventController.add(IncomingRequestEvent(address: address, name: name));
+    };
+
+    native.onConnected = (id, address) {
+      final info = _connections[address] ??= ConnectionInfo(
+        address: address,
+        role: ConnectionRole.initiator,
+        nativeConnectionId: id,
+      );
+      info.nativeConnectionId = id;
+      info.lastActivityAt = DateTime.now();
+
+      // Socket is up - announce ourselves so the other side knows who we are
+      final nameBytes = utf8.encode(AppConstants.deviceDisplayName);
+      final packet = Uint8List.fromList(
+          [AppConstants.PacketType.handshake, ...nameBytes]);
+      native.send(id, packet);
+    };
+
+    native.onData = (id, bytes) {
+      final address = native.addressForConnectionId(id);
+      if (address != null) _handleNativeData(address, bytes);
+    };
+
+    native.onDisconnected = (id) {
+      final address = native.addressForConnectionId(id);
+      if (address == null) return;
+      final info = _connections[address];
+      final wasEstablished = _establishedConnections.remove(address);
+      if (!wasEstablished && info != null && info.role == ConnectionRole.initiator) {
+        // Our outgoing request ended before being accepted
+        _eventController.add(ConnectionRequestRejectedEvent(address: address));
+      } else if (wasEstablished) {
+        _eventController.add(ConnectionLostEvent(address: address));
+      }
+      _connections.remove(address);
+    };
+
+    native.onError = (message) {
+      AppLogger.error('Native Bluetooth error: $message', 'BT');
+      if (message.contains('connect failed')) {
+        // An outgoing dial failed - release any pending initiator connection
+        for (final entry in _connections.entries.toList()) {
+          final info = entry.value;
+          if (info.role == ConnectionRole.initiator &&
+              !_establishedConnections.contains(entry.key)) {
+            _connections.remove(entry.key);
+            _eventController.add(ConnectionRequestRejectedEvent(address: entry.key));
+          }
+        }
+      }
+      onError?.call('Bluetooth error: $message');
+    };
+  }
+
+  /// Handle raw bytes arriving over the native RFCOMM socket.
+  void _handleNativeData(String address, Uint8List data) {
+    if (data.isEmpty) return;
+    final type = data[0];
+    final payload = data.length > 1 ? data.sublist(1) : Uint8List(0);
+
+    switch (type) {
+      case AppConstants.PacketType.handshake:
+        // 0x01 - the other side announced itself; we already know their
+        // name from the native 'incoming' event, so nothing to do.
+        break;
+      case AppConstants.PacketType.handshakeResponse:
+        // 0x02 - they accepted our request
+        _establishedConnections.add(address);
+        final info = _connections[address];
+        final remoteName = utf8.decode(payload, allowMalformed: true).trim();
+        if (info != null) {
+          if (remoteName.isNotEmpty) info.remoteName = remoteName;
+          info.isClassicConnected = true;
+          info.connectedAt ??= DateTime.now();
+        }
+        _eventController.add(ConnectionEstablishedEvent(
+          address: address,
+          name: remoteName.isNotEmpty ? remoteName : (info?.remoteName ?? 'Device'),
+        ));
+        break;
+      case AppConstants.PacketType.connectionRejected:
+        // 0x03 - they declined our request
+        _connections.remove(address);
+        _eventController.add(ConnectionRequestRejectedEvent(address: address));
+        break;
+      case AppConstants.PacketType.message:
+        _handleTextMessage(address, payload);
+        break;
+      case AppConstants.PacketType.messageAck:
+        _handleMessageAck(address, payload);
+        break;
+      default:
+        // e.g. file chunks - pass through to the normal packet handler
+        _handleIncomingData(address, data, 'rfcomm');
+        break;
+    }
+  }
+
+  /// Decode an incoming text message (and echo a delivery ack).
+  void _handleTextMessage(String address, Uint8List payload) {
+    try {
+      final jsonStr = utf8.decode(payload, allowMalformed: true);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final messageId = map['id']?.toString() ?? '';
+      final text = map['text']?.toString() ?? '';
+      final sentAtMs = (map['t'] as num?)?.toInt();
+      _eventController.add(TextMessageReceivedEvent(
+        address: address,
+        messageId: messageId,
+        text: text,
+        sentAt: DateTime.fromMillisecondsSinceEpoch(
+            sentAtMs ?? DateTime.now().millisecondsSinceEpoch),
+      ));
+      sendMessageAck(address, messageId);
+    } catch (e) {
+      AppLogger.error('Failed to parse text message: $e', 'BT');
+    }
+  }
+
+  /// Decode a delivery ack for a message we sent.
+  void _handleMessageAck(String address, Uint8List payload) {
+    try {
+      final jsonStr = utf8.decode(payload, allowMalformed: true);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      _eventController.add(TextMessageAckEvent(
+        address: address,
+        messageId: map['id']?.toString() ?? '',
+      ));
+    } catch (e) {
+      // ignore malformed acks
+    }
+  }
+
+  /// Send a text message to a connected device over the native socket.
+  Future<bool> sendTextMessage({
+    required String address,
+    required String messageId,
+    required String text,
+  }) async {
+    final id = NativeConnectionService.instance.connectionIdForAddress(address);
+    if (id == null) {
+      AppLogger.warn('Cannot send text: not connected to $address', 'BT');
+      return false;
+    }
+    try {
+      final map = {
+        'id': messageId,
+        'text': text,
+        't': DateTime.now().millisecondsSinceEpoch,
+      };
+      final bytes = utf8.encode(jsonEncode(map));
+      final packet = Uint8List.fromList([AppConstants.PacketType.message, ...bytes]);
+      final ok = await NativeConnectionService.instance.send(id, packet);
+      if (ok) _connections[address]?.lastActivityAt = DateTime.now();
+      return ok;
+    } catch (e) {
+      AppLogger.error('Failed to send text message to $address', 'BT', e);
+      return false;
+    }
+  }
+
+  /// Send a delivery ack for a received message.
+  Future<void> sendMessageAck(String address, String messageId) async {
+    final id = NativeConnectionService.instance.connectionIdForAddress(address);
+    if (id == null) return;
+    final bytes = utf8.encode(jsonEncode({'id': messageId}));
+    final packet = Uint8List.fromList([AppConstants.PacketType.messageAck, ...bytes]);
+    await NativeConnectionService.instance.send(id, packet);
   }
 
   // ==================== INCOMING DATA HANDLING ====================
@@ -455,23 +718,6 @@ class BluetoothService {
     }
   }
 
-  /// Establish Classic BT connection in background
-  Future<void> _establishClassicConnectionInBackground(String address) async {
-    // Don't block - attempt in background
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      try {
-        final connected = await _classicService.connectToDevice(address: address);
-        if (connected && _connections.containsKey(address)) {
-          _connections[address]!.isClassicConnected = true;
-          AppLogger.debug('Classic BT established for: $address', 'BT');
-        }
-      } catch (e) {
-        // Non-fatal - continue with BLE only
-        AppLogger.debug('Classic BT not available for: $address, using BLE only', 'BT');
-      }
-    });
-  }
-
   /// Check if device is in rejection cooldown
   bool _isInCooldown(String address) {
     final cooldownEnd = _rejectionCooldowns[address];
@@ -513,10 +759,13 @@ class BluetoothService {
     AppLogger.info('Disposing Bluetooth Service', 'BT');
     
     await disconnectAll();
+    await NativeConnectionService.instance.stop();
     await _bleService.dispose();
     await _classicService.dispose();
     
     _rejectionCooldowns.clear();
+    _establishedConnections.clear();
+    await _eventController.close();
     _isInitialized = false;
   }
 }

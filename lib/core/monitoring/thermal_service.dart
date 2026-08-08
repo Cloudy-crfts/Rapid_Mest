@@ -6,10 +6,10 @@ import '../../utils/logger.dart';
 /// Thermal State
 enum ThermalState {
   normal,      // Operating normally
-  warm,        # Slightly warm, consider throttling
-  hot,         # Hot, should throttle
-  critical,    # Very hot, must pause operations
-  unknown,     # Cannot determine
+  warm,        // Slightly warm, consider throttling
+  hot,         // Hot, should throttle
+  critical,    // Very hot, must pause operations
+  unknown,     // Cannot determine
 }
 
 /// Power State
@@ -95,7 +95,7 @@ class ThermalMonitor {
       _batteryLevel = level ?? 100;
       
       final state = await _battery.batteryState;
-      _powerState _mapBatteryState(state);
+      _powerState = _mapBatteryState(state);
       
       // Try to get initial temperature
       await _updateTemperature();

@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 /// Device Model
 /// 
 /// Represents a Bluetooth device that has been discovered or saved.
@@ -17,7 +19,7 @@ class Device {
   final int totalMessagesSent;    // Stats: messages sent to this device
   final int totalMessagesReceived; // Stats: messages received from this device
   final int totalFilesTransferred; // Stats: files exchanged
-  final long totalBytesTransferred; // Stats: bytes exchanged
+  final int totalBytesTransferred; // Stats: bytes exchanged
   final String? publicKey;        // E2E public key for encryption
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -122,7 +124,7 @@ class Device {
     int? totalMessagesSent,
     int? totalMessagesReceived,
     int? totalFilesTransferred,
-    long? totalBytesTransferred,
+    int? totalBytesTransferred,
     String? publicKey,
     DateTime? createdAt,
     DateTime? updatedAt,

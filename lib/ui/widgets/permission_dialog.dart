@@ -24,7 +24,7 @@ import '../theme/dark_theme.dart';
 class FilePermissionDialog extends StatelessWidget {
   final String senderName;
   final String fileName;
-  final long fileSize;
+  final int fileSize;
   final String? mimeType;
   final VoidCallback onAccept;
   final VoidCallback onReject;
@@ -44,7 +44,7 @@ class FilePermissionDialog extends StatelessWidget {
     required BuildContext context,
     required String senderName,
     required String fileName,
-    required long fileSize,
+    required int fileSize,
     String? mimeType,
   }) async {
     final result = await showDialog<bool>(

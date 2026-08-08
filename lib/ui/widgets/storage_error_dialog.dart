@@ -22,8 +22,8 @@ import '../theme/dark_theme.dart';
 
 class StorageErrorDialog extends StatelessWidget {
   final String? message;
-  final long? requiredSpace;
-  final long? availableSpace;
+  final int? requiredSpace;
+  final int? availableSpace;
   final VoidCallback? onOk;
 
   const StorageErrorDialog({
@@ -37,8 +37,8 @@ class StorageErrorDialog extends StatelessWidget {
   /// Show the dialog with exact user-specified message
   static Future<void> show({
     required BuildContext context,
-    long? requiredSpace,
-    long? availableSpace,
+    int? requiredSpace,
+    int? availableSpace,
   }) {
     return showDialog(
       context: context,
@@ -149,7 +149,7 @@ class StorageErrorDialog extends StatelessWidget {
   }
 
   /// Build a space information row
-  Widget _buildSpaceRow(String label, long bytes, Color color, {bool isBold = false}) {
+  Widget _buildSpaceRow(String label, int bytes, Color color, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

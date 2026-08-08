@@ -221,13 +221,13 @@ class FileTransferDao {
     // Set timestamp based on status
     switch (newStatus) {
       case AppConstants.TransferStatus.transferring:
-        updates['started_at'] ??= DateTime.now().toIso8601String();
+        if (!updates.containsKey('started_at')) {
+          updates['started_at'] = DateTime.now().toIso8601String();
+        }
+        updates['resumed_at'] = DateTime.now().toIso8601String();
         break;
       case AppConstants.TransferStatus.paused:
         updates['paused_at'] = DateTime.now().toIso8601String();
-        break;
-      case AppConstants.TransferStatus.transferring: // Resuming from pause
-        updates['resumed_at'] = DateTime.now().toIso8601String();
         break;
       case AppConstants.TransferStatus.completed:
       case AppConstants.TransferStatus.failed:
@@ -251,11 +251,11 @@ class FileTransferDao {
   /// Update transfer progress
   Future<void> updateProgress({
     required int transferId,
-    required long bytesTransferred,
-    required long lastChunkIndex,
+    required int bytesTransferred,
+    required int lastChunkIndex,
     Set<int>? receivedChunks,
     int? currentSpeed,
-    long? averageSpeed,
+    int? averageSpeed,
   }) async {
     final db = await _db;
     
@@ -288,7 +288,7 @@ class FileTransferDao {
     required int transferId,
     required int chunkIndex,
     Set<int> allReceivedChunks,
-    long totalBytesSoFar,
+    int totalBytesSoFar,
   }) async {
     final db = await _db;
     
@@ -424,7 +424,7 @@ class FileTransferDao {
   // ==================== STATISTICS ====================
 
   /// Get total transferred bytes (all time)
-  Future<long> getTotalTransferredBytes() async {
+  Future<int> getTotalTransferredBytes() async {
     final db = await _db;
     final result = await db.rawQuery('''
       SELECT COALESCE(SUM(bytes_transferred), 0) as total 

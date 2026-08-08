@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../utils/constants.dart';
@@ -22,9 +23,9 @@ class StorageMonitor {
   static StorageMonitor get instance => _instance;
 
   // Thresholds (in bytes)
-  long _criticalThreshold;   // Below this = cannot operate
-  long _warningThreshold;    // Below this = show warnings
-  long _recommendedMinimum;  // Recommended minimum for smooth operation
+  int _criticalThreshold;    // Below this = cannot operate
+  int _warningThreshold;     // Below this = show warnings
+  int _recommendedMinimum;   // Recommended minimum for smooth operation
 
   // Current state
   StorageInfo? _currentStorage;
@@ -47,9 +48,9 @@ class StorageMonitor {
 
   /// Set custom thresholds
   void setThresholds({
-    long? criticalMB,
-    long? warningMB,
-    long? recommendedMB,
+    int? criticalMB,
+    int? warningMB,
+    int? recommendedMB,
   }) {
     if (criticalMB != null) _criticalThreshold = criticalMB * 1024 * 1024;
     if (warningMB != null) _warningThreshold = warningMB * 1024 * 1024;
@@ -132,16 +133,16 @@ class StorageMonitor {
   /// 
   /// Returns true if enough space, false otherwise
   /// If not enough space, triggers appropriate callback
-  Future<bool> hasEnoughSpaceFor(long fileSize) async {
+  Future<bool> hasEnoughSpaceFor(int fileSize) async {
     final info = await getStorageInfo();
     
     // Need at least the file size + 10% buffer + 50MB safety margin
-    final required = (fileSize * 1.1).toLong() + (50 * 1024 * 1024);
+    final needed = (fileSize * 1.1).toInt() + (50 * 1024 * 1024);
     
-    if (info.freeSpace < required) {
-      final deficit = required - info.freeSpace;
+    if (info.freeSpace < needed) {
+      final deficit = needed - info.freeSpace;
       final message = '''Not enough storage!
-Needed: ${Helpers.formatFileSize(required)}
+Needed: ${Helpers.formatFileSize(needed)}
 Available: ${Helpers.formatFileSize(info.freeSpace)}
 Shortage: ${Helpers.formatFileSize(deficit)}''';
       
@@ -161,7 +162,7 @@ Shortage: ${Helpers.formatFileSize(deficit)}''';
   /// Check and throw exception if not enough space
   /// 
   /// Use this before starting file transfers
-  Future<void> requireSpaceFor(long fileSize, {String? fileName}) async {
+  Future<void> requireSpaceFor(int fileSize, {String? fileName}) async {
     final hasSpace = await hasEnoughSpaceFor(fileSize);
     
     if (!hasSpace) {
@@ -213,7 +214,7 @@ Shortage: ${Helpers.formatFileSize(deficit)}''';
   }
 
   /// Format storage amount for display
-  static String formatStorage(long bytes) => Helpers.formatFileSize(bytes);
+  static String formatStorage(int bytes) => Helpers.formatFileSize(bytes);
 
   /// Start periodic monitoring
   Timer? startPeriodicCheck({Duration interval = const Duration(minutes: 5)}) {
@@ -239,9 +240,9 @@ enum StorageStatus {
 
 /// Detailed storage information
 class StorageInfo {
-  final long totalSpace;
-  final long freeSpace;
-  final long usedSpace;
+  final int totalSpace;
+  final int freeSpace;
+  final int usedSpace;
   final String appUsagePath;
   final DateTime lastUpdated;
 
@@ -289,8 +290,8 @@ class StorageSummary {
 /// Exception thrown when storage is insufficient
 class StorageException implements Exception {
   final String message;
-  final long requiredBytes;
-  final long availableBytes;
+  final int requiredBytes;
+  final int availableBytes;
 
   StorageException(
     this.message, {

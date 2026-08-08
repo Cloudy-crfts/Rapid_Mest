@@ -1,20 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'ui/screens/home_screen.dart';
+import 'ui/screens/chat_screen.dart';
+import 'ui/screens/device_scan_screen.dart';
+import 'ui/widgets/connection_request_dialog.dart';
 import 'core/database/app_database.dart';
 import 'core/bluetooth/bluetooth_service.dart';
+
+/// Global navigator key so the connection-request dialog can be shown from
+/// anywhere in the app, even when no screen is actively listening.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Request the Bluetooth permissions the app needs at runtime
+  await _requestBluetoothPermissions();
+
   // Initialize database
   await AppDatabase.instance.database;
-  
-  // Initialize Bluetooth service (does not start scanning automatically)
-  final bluetoothService = BluetoothService.instance;
-  await bluetoothService.initialize();
-  
+
+  // Initialize Bluetooth service (starts RFCOMM server + BLE advertising)
+  await BluetoothService.instance.initialize();
+
+  // Show the Accept/Reject dialog when another phone requests a connection
+  _setupConnectionRequestListener();
+
   runApp(const RapidMeshApp());
+}
+
+/// Request the runtime permissions needed for BLE scanning, advertising and
+/// connecting over Bluetooth (Android 12+) plus legacy location on old Android.
+Future<void> _requestBluetoothPermissions() async {
+  try {
+    await Permission.bluetoothScan.request();
+    await Permission.bluetoothConnect.request();
+    await Permission.bluetoothAdvertise.request();
+    if (!await Permission.location.isGranted) {
+      await Permission.location.request();
+    }
+  } catch (_) {
+    // Permissions are surfaced again when the user starts a scan
+  }
+}
+
+/// Listens for real connection events and shows the global Accept/Reject
+/// dialog (or a success snackbar) no matter which screen is open.
+void _setupConnectionRequestListener() {
+  final bt = BluetoothService.instance;
+  bt.events.listen((event) {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    if (event is IncomingRequestEvent) {
+      ConnectionRequestDialog.show(
+        ctx,
+        deviceName: event.name,
+        address: event.address,
+        onAccept: () => bt.acceptIncomingConnection(event.address),
+        onReject: () => bt.rejectIncomingConnection(event.address),
+      );
+    } else if (event is ConnectionEstablishedEvent) {
+      final navigator = navigatorKey.currentState;
+      final currentRoute = ModalRoute.of(ctx)?.settings.name;
+      final scanScreenOpen = currentRoute == '/scan' || currentRoute == '/chat';
+
+      if (navigator != null && !scanScreenOpen) {
+        // We are not on the scan screen: open the chat directly (e.g. the
+        // other phone accepted while we were on the home screen).
+        navigator.pushNamed(
+          '/chat',
+          arguments: {'name': event.name, 'address': event.address},
+        );
+      } else {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('✓ Connected to ${event.name}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade600,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  });
 }
 
 class RapidMeshApp extends StatelessWidget {
@@ -25,6 +95,7 @@ class RapidMeshApp extends StatelessWidget {
     return MaterialApp(
       title: 'Rapid Mesh',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       
       // Dark Theme - Instagram Style (Color Scheme B)
       theme: ThemeData(
@@ -53,9 +124,6 @@ class RapidMeshApp extends StatelessWidget {
           inversePrimary: Color(0xFF000000),     // Text on inverse
         ),
         
-        // Typography - Inter font family
-        fontFamily: 'Inter',
-        
         // App Bar Theme
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF121212),
@@ -67,7 +135,6 @@ class RapidMeshApp extends StatelessWidget {
             color: Color(0xFFFFFFFF),
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            fontFamily: 'Inter',
           ),
         ),
         
@@ -129,54 +196,26 @@ class RapidMeshApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         
-        // Divider Theme
-        dividerTheme: const DividerThemeData(
-          color: Color(0xFF2A2A2A),
-          thickness: 1,
-        ),
-        
-        // Floating Action Button Theme
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFF7B68EE),
-          foregroundColor: Color(0xFFFFFFFF),
-        ),
-        
-        // Chip Theme
-        chipTheme: ChipThemeData(
-          backgroundColor: const Color(0xFF2D2D2D),
-          selectedColor: const Color(0xFF7B68EE).withOpacity(0.2),
-          labelStyle: const TextStyle(color: Color(0xFFFFFFFF)),
-          side: BorderSide.none,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        
-        // Progress Indicator Theme
-        progressIndicatorTheme: const ProgressIndicatorThemeData(
-          color: Color(0xFF7B68EE),
-          linearTrackColor: Color(0xFF2D2D2D),
-        ),
-        
-        // Switch Theme
-        switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return const Color(0xFF7B68EE);
-            }
-            return const Color(0xFF666666);
-          }),
-          trackColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return const Color(0xFF7B68EE).withOpacity(0.5);
-            }
-            return const Color(0xFF3D3D3D);
-          }),
-        ),
-        
         // Scaffold Background Color
         scaffoldBackgroundColor: const Color(0xFF121212),
       ),
       
       home: const HomeScreen(),
+      
+      // Named routes used by the UI
+      routes: {
+        '/scan': (context) => const DeviceScanScreen(),
+        '/chat': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return ChatScreen(
+              deviceName: (args['name'] as String?) ?? 'Device',
+              deviceAddress: args['address'] as String?,
+            );
+          }
+          return ChatScreen(deviceName: (args as String?) ?? 'Device');
+        },
+      },
     );
   }
 }

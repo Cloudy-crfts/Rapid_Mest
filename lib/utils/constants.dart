@@ -12,6 +12,9 @@ class AppConstants {
   /// Application name
   static const String appName = 'Rapid Mesh';
   
+  /// Name sent to other devices during the connection handshake
+  static const String deviceDisplayName = 'Rapid Mesh User';
+  
   /// Package name
   static const String packageName = 'com.rapidmesh.app';
   
@@ -24,19 +27,19 @@ class AppConstants {
   // ==================== BLUETOOTH CONFIGURATION ====================
   
   /// Service UUID for Rapid Mesh BLE
-  static const String bleServiceUuid = '0000RAPID-MESH-0000-8000-00805F9B34FB';
+  static const String bleServiceUuid = 'a5f0c9e1-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
   
   /// Characteristic UUID for messaging
-  static const String messageCharacteristicUuid = '0000MSG-CHAR-0000-8000-00805F9B34FB';
+  static const String messageCharacteristicUuid = 'a5f0c9e1-2b3d-4e5f-8a9b-0c1d2e3f4a5c';
   
   /// Characteristic UUID for file transfer control
-  static const String fileControlCharacteristicUuid = '0000FILE-CTRL-0000-8000-00805F9B34FB';
+  static const String fileControlCharacteristicUuid = 'a5f0c9e1-2b3d-4e5f-8a9b-0c1d2e3f4a5d';
   
   /// Characteristic UUID for file data (large payloads)
-  static const String fileDataCharacteristicUuid = '0000FILE-DATA-0000-8000-00805F9B34FB';
+  static const String fileDataCharacteristicUuid = 'a5f0c9e1-2b3d-4e5f-8a9b-0c1d2e3f4a5e';
   
   /// Characteristic UUID for connection handshake
-  static const String handshakeCharacteristicUuid = '0000HANDSHAKE-0000-8000-00805F9B34FB';
+  static const String handshakeCharacteristicUuid = 'a5f0c9e1-2b3d-4e5f-8a9b-0c1d2e3f4a5f';
   
   /// Device name prefix for identification
   static const String deviceNamePrefix = '[RM] ';
@@ -193,6 +196,7 @@ class AppConstants {
   class PacketType {
     static const int handshake = 0x01;
     static const int handshakeResponse = 0x02;
+    static const int connectionRejected = 0x03;
     static const int message = 0x10;
     static const int messageAck = 0x11;
     static const int fileRequest = 0x20;

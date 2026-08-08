@@ -1,10 +1,6 @@
-package com.rapidmesh.app
+package com.rapidmesh
 
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity: FlutterActivity() {
-    // Rapid Mesh Main Activity
-    // - No internet permissions (enforced in AndroidManifest.xml)
-    // - Bluetooth only communication
-    // - Foreground service for persistent connections
-}
+// The active MainActivity lives in the com.rapidmesh.app package and wires
+// up the native Bluetooth layer (RapidMeshNative). This file intentionally
+// declares nothing so the legacy duplicate is removed without a redeclaration
+// conflict.

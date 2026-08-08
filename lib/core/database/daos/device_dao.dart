@@ -227,7 +227,7 @@ class DeviceDao {
       updates['total_messages_sent'] = 'total_messages_sent + 1';
     }
     if (receivedMessage) {
-      updates['total_messages_received'] = total_messages_received + 1;
+      updates['total_messages_received'] = 'total_messages_received + 1';
     }
     if (transferredFile) {
       updates['total_files_transferred'] = 'total_files_transferred + 1';
