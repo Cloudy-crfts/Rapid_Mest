@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App-specific storage for received files -->
+    <files-path name="received_files" path="received_files/" />
+    <files-path name="sent_files" path="sent_files/" />
+    <files-path name="voice_messages" path="voice_messages/" />
+    <files-path name="images" path="images/" />
+    <files-path name="temp_transfers" path="temp_transfers/" />
+    <cache-path name="thumbnails" path="thumbnails/" />
+    <cache-path name="cache" path="cache/" />
+</paths>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 
+        RAPID MESH - PERMISSION PHILOSOPHY
+        =====================================
+        
+        ⚠️ CRITICAL: NO INTERNET, WI-FI, OR CELLULAR PERMISSIONS
+        This app is 100% offline, Bluetooth-only P2P.
+        
+        Permissions we explicitly DO NOT request:
+        ❌ android.permission.INTERNET
+        ❌ android.permission.ACCESS_NETWORK_STATE
+        ❌ android.permission.ACCESS_WIFI_STATE
+        ❌ android.permission.CHANGE_WIFI_STATE
+        ❌ android.permission.CHANGE_NETWORK_STATE
+    -->
+
+    <!-- Bluetooth Permissions (Required) -->
+    
+    <!-- Legacy Bluetooth for Android 11 and below -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    
+    <!-- Bluetooth Connect for Android 12+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    
+    <!-- Bluetooth Scan for discovering nearby devices -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    
+    <!-- Bluetooth Advertise to be discoverable -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    
+    <!-- Location: Required by Android for BLE scanning (even without GPS data) -->
+    <!-- We use neverForLocation flag above to indicate we don't need physical location -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <!-- File Storage Permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    
+    <!-- For Android 13+ media access -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- Foreground Service for persistent Bluetooth connections -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        android:minSdk="34" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Phone State for device info (optional, for display name generation) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"
+        android:maxSdkVersion="29" />
+
+    <!-- Voice messages -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Contact cards sharing -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Hardware Features -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+    
+    <!-- 
+        IMPORTANT: No wifi or telephony features declared
+        This ensures the app won't install on devices without Bluetooth
+    -->
+
+    <application
+        android:name=".RapidMeshApplication"
+        android:label="Rapid Mesh"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.RapidMesh.Dark"
+        android:requestLegacyExternalStorage="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:networkSecurityConfig="@xml/network_security_config">
+        
+        <!-- 
+            Network Security Config blocks ALL network access
+            Even if someone tries to add internet code, it will fail
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            
+            <!-- Handle file sharing via intent -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground Service for persistent Bluetooth operations -->
+        <service
+            android:name=".services.BluetoothForegroundService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false" />
+
+        <!-- Provider for file sharing -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>
