@@ -1,8 +1,8 @@
 package com.rapidmesh.app
 
-import android.app.Application
+import io.flutter.app.FlutterApplication
 
-class RapidMeshApplication : Application() {
+class RapidMeshApplication : FlutterApplication() {
     // Rapid Mesh Application
     // Application-level initializations can be added here if needed.
 }
