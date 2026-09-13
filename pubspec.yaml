@@ -1,0 +1,57 @@
+name: rapid_mesh
+description: Rapid Mesh - Offline P2P Bluetooth Messaging & File Sharing
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+
+  # Database (SQLite)
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  path_provider: ^2.1.1
+
+  # Bluetooth - BLE
+  flutter_blue_plus: ^1.31.15
+
+  # Bluetooth - Classic (maintained fork of flutter_bluetooth_serial;
+  # the original package 0.4.x is incompatible with Dart 3 / modern AGP)
+  flutter_bluetooth_serial_plus: ^0.5.6
+
+  # Encryption & Security
+  cryptography: ^2.7.1
+  pointycastle: ^3.7.3
+
+  # Permissions
+  permission_handler: ^11.1.0
+
+  # File picking (select files to send, save/restore the device log)
+  file_picker: ^12.0.0
+
+  # Image processing (downscale profile avatars before sharing)
+  image: ^4.5.0
+
+  # Notifications (foreground connection status)
+  flutter_local_notifications: ^17.2.3
+
+  # Battery / thermal monitoring
+  battery_plus: ^6.0.0
+
+  # Utilities
+  intl: ^0.18.1
+  logger: ^2.0.2+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true

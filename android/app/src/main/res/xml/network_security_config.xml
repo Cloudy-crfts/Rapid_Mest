@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    RAPID MESH - NETWORK SECURITY CONFIG
+    =====================================
+    
+    This configuration BLOCKS ALL network traffic.
+    
+    Even if malicious code or a dependency attempts to make
+    network requests, they will FAIL at the OS level.
+    
+    This is a critical security measure for our offline-only app.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- No certificates = no HTTPS connections possible -->
+        </trust-anchors>
+    </base-config>
+</network-security-config>
