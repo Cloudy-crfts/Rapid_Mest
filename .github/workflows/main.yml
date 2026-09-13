@@ -1,0 +1,112 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # The repository is missing android/gradle/wrapper/gradle-wrapper.jar,
+      # so restore it before building (it is not committed to Git).
+      - name: Restore missing Gradle wrapper jar
+        run: |
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            curl -fsSL -o android/gradle/wrapper/gradle-wrapper.jar \
+              https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar
+          fi
+
+      # Use the flavor that matches your build.gradle productFlavors.
+      # Output is tee'd to a file so the failure step below can report the
+      # relevant errors back to the pull request.
+      - name: Build APK
+        run: |
+          set -o pipefail
+          flutter build apk --release --flavor production 2>&1 | tee build-log.txt
+
+      # Surface the interesting part of the log as GitHub error annotations
+      # (readable from the checks API) AND as a PR comment.
+      - name: Annotate build errors
+        if: failure()
+        run: |
+          grep -nE 'Error|error|\.dart:[0-9]+|Exception|FAILURE|Could not|not found|Undefined' build-log.txt \
+            | head -n 12 \
+            | sed 's/^/::error::/' || true
+
+      - name: Report build errors to PR
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          python3 - <<'PY'
+          import os, json, re, urllib.request
+          repo = os.environ["GITHUB_REPOSITORY"]
+          pr = os.environ.get("PR_NUMBER")
+          if not pr:
+              print("no PR number, skipping comment")
+              raise SystemExit(0)
+          log = open("build-log.txt", errors="replace").read()
+
+          # Every compiler error line looks like:  lib/foo.dart:12:34: Error: <msg>
+          errs = re.findall(r"([^\s:]+\.dart:\d+:\d+: Error: [^\n]+)", log)
+          # Dedupe while preserving order.
+          seen, uniq = set(), []
+          for e in errs:
+              if e not in seen:
+                  seen.add(e)
+                  uniq.append(e)
+
+          if not uniq:
+              body = ("## APK build failed\n\nNo `*.dart` errors found in the log. "
+                      "Raw tail:\n\n```\n" + log[-6000:] + "\n```")
+          else:
+              body = ("## APK build failed\n\n"
+                      "**{} error lines ({} unique):**\n\n```\n".format(len(errs), len(uniq))
+                      + "\n".join(uniq[:250])
+                      + ("\n... ({} more not shown)".format(len(uniq) - 250) if len(uniq) > 250 else "")
+                      + "\n```")
+
+          req = urllib.request.Request(
+              "https://api.github.com/repos/{}/issues/{}/comments".format(repo, pr),
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": "token " + os.environ["GITHUB_TOKEN"],
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json",
+              },
+          )
+          try:
+              urllib.request.urlopen(req, timeout=30)
+              print("comment posted with", len(uniq), "unique errors")
+          except Exception as e:
+              print("comment post failed:", e)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: rapid-mesh-apk
+          path: build/app/outputs/flutter-apk/app-production-release.apk
