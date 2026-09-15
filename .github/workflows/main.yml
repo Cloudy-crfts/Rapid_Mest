@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -110,3 +110,22 @@ jobs:
         with:
           name: rapid-mesh-apk
           path: build/app/outputs/flutter-apk/app-production-release.apk
+
+      # When the workflow is run manually, also publish the APK to a GitHub
+      # Release so it has a permanent download link on the Releases page.
+      - name: Publish APK to GitHub Release
+        if: success() && github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=build/app/outputs/flutter-apk/app-production-release.apk
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: *//; s/+.*//')
+          TAG="v$VERSION"
+          echo "Publishing $APK as release $TAG"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" "$APK#RapidMesh-$TAG-production.apk" \
+              --title "Rapid Mesh $TAG" \
+              --notes "Production release APK of Rapid Mesh (Android 11+). Built by GitHub Actions from commit $GITHUB_SHA."
+          else
+            gh release upload "$TAG" "$APK#RapidMesh-$TAG-production.apk" --clobber
+          fi
