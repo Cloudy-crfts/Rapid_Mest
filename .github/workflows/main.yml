@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, arena/01a0a532-rapid-mest]
   pull_request:
   workflow_dispatch:
 
@@ -114,7 +114,7 @@ jobs:
       # When the workflow is run manually, also publish the APK to a GitHub
       # Release so it has a permanent download link on the Releases page.
       - name: Publish APK to GitHub Release
-        if: success() && github.event_name == 'workflow_dispatch'
+        if: success() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
