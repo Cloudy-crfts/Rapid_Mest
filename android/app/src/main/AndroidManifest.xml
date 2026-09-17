@@ -6,16 +6,24 @@
         RAPID MESH - PERMISSION PHILOSOPHY
         =====================================
         
-        ⚠️ CRITICAL: NO INTERNET, WI-FI, OR CELLULAR PERMISSIONS
-        This app is 100% offline, Bluetooth-only P2P.
+        Bluetooth-only P2P for ALL messaging and file transfer.
+        The single exception: ONE small ad banner on the home screen
+        (Google AdMob) needs internet access. Nothing else in the app
+        uses the network, and the app works fully offline.
         
-        Permissions we explicitly DO NOT request:
-        ❌ android.permission.INTERNET
-        ❌ android.permission.ACCESS_NETWORK_STATE
+        Internet-related permissions — AD BANNER ONLY:
+        ✅ android.permission.INTERNET
+        ✅ android.permission.ACCESS_NETWORK_STATE  (lets the SDK detect "offline" silently)
+        
+        Permissions we still DO NOT request:
         ❌ android.permission.ACCESS_WIFI_STATE
         ❌ android.permission.CHANGE_WIFI_STATE
         ❌ android.permission.CHANGE_NETWORK_STATE
     -->
+
+    <!-- Internet: required ONLY to load the single home-screen ad banner -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Bluetooth Permissions (Required) -->
     
@@ -96,10 +104,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- 
-            Network Security Config blocks ALL network access
-            Even if someone tries to add internet code, it will fail
-        -->
+        <!-- AdMob App ID — REQUIRED by the google_mobile_ads plugin.
+             ⚠️ This is Google's public TEST App ID. Replace it with your own
+             from https://admob.com before release, or ads stay in test mode
+             and generate no revenue. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
 
         <activity
             android:name=".MainActivity"

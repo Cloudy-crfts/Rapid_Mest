@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/chat_screen.dart';
@@ -17,6 +20,11 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize the ads SDK for the single home-screen banner.
+  // Fire-and-forget on purpose: a slow/missing network must never delay
+  // app startup, and the banner stays invisible until an ad arrives.
+  unawaited(MobileAds.instance.initialize());
 
   // Request the Bluetooth permissions the app needs at runtime
   await _requestBluetoothPermissions();

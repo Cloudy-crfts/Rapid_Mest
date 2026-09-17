@@ -2,18 +2,19 @@
 <!--
     RAPID MESH - NETWORK SECURITY CONFIG
     =====================================
-    
-    This configuration BLOCKS ALL network traffic.
-    
-    Even if malicious code or a dependency attempts to make
-    network requests, they will FAIL at the OS level.
-    
-    This is a critical security measure for our offline-only app.
+
+    System certificates are trusted so the home-screen ad banner
+    (Google AdMob, HTTPS only) can load. Everything else about the
+    app stays Bluetooth-only.
+
+    Cleartext (HTTP) traffic remains BLOCKED app-wide — any network
+    call that does happen must be encrypted (HTTPS).
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <!-- No certificates = no HTTPS connections possible -->
+            <!-- System CAs: required for the ad banner's HTTPS calls -->
+            <certificates src="system" />
         </trust-anchors>
     </base-config>
 </network-security-config>

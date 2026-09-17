@@ -41,6 +41,10 @@ dependencies:
   # Notifications (foreground connection status)
   flutter_local_notifications: ^17.2.3
 
+  # Monetization — ONE small banner ad, home screen only.
+  # This is the app's ONLY use of the internet.
+  google_mobile_ads: ^5.3.1
+
   # Battery / thermal monitoring
   battery_plus: ^6.0.0
 

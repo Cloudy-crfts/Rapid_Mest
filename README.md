@@ -32,10 +32,15 @@
 
 ### 🔒 Security & Privacy
 - **AES-256-GCM end-to-end encryption** on all data
-- **Zero network permissions** — no internet, Wi-Fi, or cellular access
+- **Internet used for ONE thing only** — a single small ad banner on the home screen
 - **Sandboxed storage** — files inaccessible to other apps
-- **No servers, no accounts, no tracking**
+- **No servers, no accounts** — chats & files never leave Bluetooth
 - **Pure local identity** via nickname only
+
+### 📺 Monetization (The Un-Annoying Kind)
+- **Exactly one ad** — a small banner pinned at the bottom of the home screen
+- **No pop-ups, no interstitials, no video ads** — nothing in chats or during transfers, ever
+- **Disappears when offline** — if there's no connection, the banner simply doesn't render
 
 ### ⚡ Performance
 - **Thermal monitoring** with aggressive throttling
@@ -175,22 +180,23 @@ lib/
 
 ## 🔧 Configuration
 
-### Android Permissions (Bluetooth Only!)
+### Android Permissions
 
-The app explicitly **excludes** all network permissions:
+All messaging & file transfer runs **100% over Bluetooth**. The only
+network permission exists for the single home-screen ad banner:
 
 ```xml
-<!-- ✅ ALLOWED: Bluetooth permissions -->
+<!-- ✅ Bluetooth permissions — the core app -->
 <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-<!-- ❌ EXPLICITLY DENIED: No internet/Wi-Fi/cellular -->
-<!-- No INTERNET permission -->
-<!-- No ACCESS_NETWORK_STATE -->
-<!-- No ACCESS_WIFI_STATE -->
-<!-- No CHANGE_NETWORK_STATE -->
+<!-- ✅ Internet — used ONLY by the one small ad banner -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- ❌ Still never requested: Wi-Fi state control, analytics, accounts -->
 ```
 
 ### Color Theme (Option B)
@@ -274,7 +280,7 @@ The app explicitly **excludes** all network permissions:
 - **Bluetooth 4.0+** (BLE support required)
 - **Storage permission** for received files
 - **Location permission** (Android requirement for BLE scanning)
-- **No internet needed!** 🎉
+- **No internet needed to chat or send files!** 🎉 (only the single home-screen ad uses connectivity — offline it simply doesn't show)
 
 ---
 

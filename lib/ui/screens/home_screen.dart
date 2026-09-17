@@ -9,6 +9,7 @@ import '../../core/database/models/device.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
 import '../theme/dark_theme.dart';
+import '../widgets/ad_banner.dart';
 
 /// Home Screen
 /// 
@@ -88,8 +89,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
       
-      // Bottom Navigation (WhatsApp-style)
-      bottomNavigationBar: Container(
+      // Bottom Navigation (WhatsApp-style), with the app's ONE small ad
+      // banner pinned just above it. Invisible when offline.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const HomeAdBanner(),
+            Container(
         decoration: BoxDecoration(
           color: AppTheme.background,
           boxShadow: [
@@ -121,8 +129,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
+            ),
+          ],
+        ),
       ),
-      
+
       // Floating Action Button (for new scan)
       floatingActionButton: _currentIndex == 1
           ? FloatingActionButton(

@@ -10,13 +10,13 @@
 
 ## 📋 Executive Summary
 
-Rapid Mesh is designed as a **100% offline, serverless P2P application** with zero internet/Wi-Fi permissions. This architecture inherently eliminates many common attack vectors (server breaches, cloud data leaks, MITM over internet). However, **Bluetooth-based attacks remain possible**, and this audit identifies all potential vulnerabilities along with the mitigations already implemented.
+Rapid Mesh is designed as a **Bluetooth-only, serverless P2P application**. Since v1.0.0 the app holds the internet permission **exclusively to display one small ad banner** (Google AdMob) on the home screen — all messaging and file transfer remain 100% Bluetooth P2P. This architecture still eliminates most common attack vectors (server breaches, cloud data leaks, MITM over internet). However, **Bluetooth-based attacks remain possible**, and this audit identifies all potential vulnerabilities along with the mitigations already implemented.
 
 ### Overall Security Rating: ⭐⭐⭐⭐☆ (4/5 - SECURE)
 
 | Category | Status | Risk Level |
 |----------|--------|------------|
-| Network Isolation | ✅ Implemented | None |
+| Network Isolation | ⚠️ Partial (single ad banner uses internet) | Very Low |
 | Data Encryption | ✅ Implemented | Very Low |
 | Bluetooth Security | ⚠️ Partially Mitigated | Low-Medium |
 | Local Storage | ✅ Secure | Very Low |
@@ -29,24 +29,28 @@ Rapid Mesh is designed as a **100% offline, serverless P2P application** with ze
 
 ### 1. Network-Level Hardening
 
-#### 1.1 No Internet Permission (CRITICAL)
+#### 1.1 Internet Permission: Single Ad Banner Only
 ```xml
 <!-- AndroidManifest.xml -->
-<!-- Explicitly NO internet, Wi-Fi, or cellular permissions -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<!-- Used exclusively by the home-screen Google AdMob banner.
+     Chats, file transfers and the Bluetooth stack never touch the network. -->
 ```
 
-**What This Prevents:**
-- ❌ Data exfiltration to remote servers
-- ❌ C&C communication for malware
-- ❌ API calls leaking user data
-- ❌ Analytics/tracking without consent
-- ❌ Cloud-based attacks
+**Scope of the exception:**
+- ⚠️ One ad banner (Google AdMob) loads over HTTPS when the phone is online
+- ✅ No accounts, analytics, or app-level tracking added
+- ✅ All messages/files still travel P2P over Bluetooth, E2E encrypted
+- ✅ App remains fully functional with zero connectivity (banner hides)
 
 **Verification:**
 ```bash
-# Check APK has no network permissions
+# Only these two network permissions should be present:
 aapt dump badging rapid_mesh.apk | grep -E "INTERNET|NETWORK|WIFI"
-# Expected: No results
+# Expected: INTERNET + ACCESS_NETWORK_STATE only (for the ad)
+# Note: the AdMob SDK itself performs standard ad-related data collection;
+# see https://policies.google.com/technologies/ads for its data practices.
 ```
 
 #### 1.2 Network Security Config (Defense in Depth)
@@ -54,12 +58,12 @@ aapt dump badging rapid_mesh.apk | grep -E "INTERNET|NETWORK|WIFI"
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <!-- Empty = no certificates accepted -->
+            <certificates src="system" /> <!-- for the ad banner's HTTPS -->
         </trust-anchors>
     </base-config>
 </network-security-config>
 ```
-**Even if code tries to make HTTP requests, Android OS will block them at the network layer.**
+**Cleartext (HTTP) remains blocked app-wide — the ad banner can only load over encrypted HTTPS, and nothing else in the app makes network calls.**
 
 ---
 
@@ -291,7 +295,7 @@ bool _isRateLimited(String address) {
 **Additional Hardening:**
 - Use Flutter's `--obfuscate` flag
 - Consider native library (.so) for core crypto
-- Certificate pinning (even though we don't use internet)
+- Certificate pinning for the ad banner's traffic
 
 ---
 
@@ -361,7 +365,7 @@ bool _isRateLimited(String address) {
 
 | Feature | Rapid Mesh | ShareIt | Xender | AirDrop |
 |---------|------------|---------|--------|---------|
-| Internet Permission | ❌ None | ✅ Required | ✅ Required | N/A (Apple) |
+| Internet Permission | ⚠️ One ad banner only | ✅ Required | ✅ Required | N/A (Apple) |
 | E2E Encryption | ✅ AES-256-GCM | ⚠️ Optional | ⚠️ Weak | ✅ Yes |
 | Server Dependency | ❌ None | ✅ Required | ✅ Required | ❌ None |
 | Open Source | ✅ Planned | ❌ No | ❌ No | ❌ No |
